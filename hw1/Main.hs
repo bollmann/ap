@@ -8,10 +8,9 @@
 
 module Main where
 
-import Data.List (intersect)
-import Data.List (maximumBy)
+import Data.List (intersect, maximumBy)
 import Data.Ord
-import Prelude hiding (all, reverse, takeWhile, zip, concat, concatMap)
+import Prelude hiding (all, reverse, takeWhile, zip, concat, concatMap, seq)
 import Test.HUnit
 
 main :: IO ()
@@ -376,16 +375,19 @@ testBowlingKata = TestList (map checkOutput scores) where
   -- run each bowling test on the given score function, making sure that 
   -- the expected number of tests pass.
   checkOutput (name, score, pass) = " Testing score" ++ [name] ~: do 
-    (s0,_) <- testSilently $ (TestList $ bowlingTests `zap` (repeat score))
+    (s0,_) <- testSilently (TestList $ bowlingTests `zap` repeat score)
     assert $ pass @=? cases s0 - (errors s0 + failures s0)
 
 -------------------------------------------------------------------------------- 
 
 -- | Computes all subsequences of the given string.
 -- | The behavior of ties is determined by the implementation of `intersect`.
+--subseqs :: String -> [String]
+--subseqs []     = [[]]
+--subseqs (x:xs) = concatMap (\subseq -> [subseq, x:subseq]) (subseqs xs)
+
 subseqs :: String -> [String]
-subseqs []     = [[]]
-subseqs (x:xs) = concatMap (\subseq -> [subseq, x:subseq]) (subseqs xs)
+subseqs = foldr (\x seqs -> concatMap (\seq -> [seq, x:seq]) seqs) [[]]
 
 -- | Computes the longest common subsequence of the two strings.
 lcs :: String -> String -> String 
