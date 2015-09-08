@@ -61,7 +61,7 @@ treverse = "reverse" ~: TestList [reverse [3,2,1] ~?= [1,2,3],
 
 
 -- | Applies the function list point-wise to the argument list.
---   Returns the corresponding return value.
+--   Returns a list of corresponding return values.
 zap :: [a -> b] -> [a] -> [b]
 zap (f:fs) (x:xs) = f x : zap fs xs
 zap _ _ = []
@@ -231,6 +231,7 @@ transpose list
     buildRow cols row = take 1 cols ++ row
     deleteRow row rows = drop 1 row : rows
 
+-- We thought of an even nicer alternative later:
 transpose' :: [[a]] -> [[a]]
 transpose' l
   | any null l = []
@@ -322,7 +323,7 @@ score3 (x:x':xs)
   where
     strike [] = 0 -- impossible case!
     strike l@[y] = y + score3 l
-    strike l@[y,y'] = y + y'  + score3 l
+    strike l@[y,y'] = y + y' + score3 l
     strike l@(y:y':_) = y + y' + score3 l
     spare [] = 0
     spare l@(y:_) = y + score3 l
