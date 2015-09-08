@@ -9,6 +9,8 @@
 module Main where
 
 import Data.List (intersect)
+import Data.List (maximumBy)
+import Data.Ord
 import Prelude hiding (all, reverse, takeWhile, zip, concat, concatMap)
 import Test.HUnit
 
@@ -35,7 +37,8 @@ tabc = "abc" ~: TestList [abc True False True ~?= True,
                           abc True False False ~?= False,
                           abc False True True ~?= False]
 
--- | Performs some weird arithmetic
+
+-- | Performs some weird arithmetic over tuples of tuples.
 arithmetic :: ((Int, Int), Int) -> ((Int,Int), Int) -> (Int, Int, Int)
 arithmetic ((a,b),c) ((d,e),f) = (b*f - c*e, c*d - a*f, a*e - b*d)
 
@@ -43,6 +46,7 @@ tarithmetic :: Test
 tarithmetic = "arithmetic" ~:
    TestList[ arithmetic ((1,2),3) ((4,5),6) ~?= (-3,6,-3), 
              arithmetic ((3,2),1) ((4,5),6) ~?= (7,-14,7) ]
+
 
 -- | Reverses a list
 reverse :: [a] -> [a]
@@ -56,7 +60,9 @@ treverse :: Test
 treverse = "reverse" ~: TestList [reverse [3,2,1] ~?= [1,2,3],
                                   reverse [1]     ~?= [1] ]
 
+
 -- | Applies the function list point-wise to the argument list.
+--   Returns the corresponding return value.
 zap :: [a -> b] -> [a] -> [b]
 zap (f:fs) (x:xs) = f x : zap fs xs
 zap _ _ = []
@@ -92,6 +98,7 @@ tintersperse = "intersperse" ~: TestList
   , intersperse "BAR" ["FOO"] ~?= ["FOO"]
   ]
 
+
 -- invert lst returns a list with each pair reversed. 
 -- for example:
 --   invert [("a",1),("a",2)]     returns [(1,"a"),(2,"a")] 
@@ -109,6 +116,7 @@ tinvert = "invert" ~: TestList
   [ invert [("a",1), ("a",2)] ~?= [(1,"a"), (2,"a")]
   , invert [] ~?= ([] :: [(Int, Char)])
   ]
+
 
 -- takeWhile, applied to a predicate p and a list xs, 
 -- returns the longest prefix (possibly empty) of xs of elements 
@@ -131,6 +139,7 @@ ttakeWhile = "takeWhile" ~: TestList
   , takeWhile (< 0) [1,2,3] ~?= ([] :: [Int])
   ]
 
+
 -- find pred lst returns the first element of the list that 
 -- satisfies the predicate. Because no element may do so, the 
 -- answer is returned in a "Maybe".
@@ -150,6 +159,7 @@ tfind = "find" ~: TestList
   , find undefined [] ~?= (Nothing :: Maybe Int)
   ]
 
+
 -- all pred lst returns False if any element of lst fails to satisfy
 -- pred and True otherwise.
 -- for example:
@@ -165,6 +175,7 @@ tall = "all" ~: TestList
   , all even [2,4,6,8] ~?= True
   , all even [] ~?= True
   ]
+
 
 -- map2 f xs ys returns the list obtained by applying f to 
 -- each pair of corresponding elements of xs and ys. If 
@@ -187,6 +198,7 @@ tmap2 = "map2" ~: TestList
   , map2 (+) [1,1,1] [] ~?= []
   ]
 
+
 -- zip takes two lists and returns a list of corresponding pairs. If
 -- one input list is shorter, excess elements of the longer list are
 -- discarded.
@@ -203,8 +215,8 @@ tzip = "zip" ~: TestList
   , zip [] [1,2,3] ~?= ([] :: [(Int,Int)])
   ]
 
--- transpose  (WARNING: this one is tricky!)
 
+-- transpose  (WARNING: this one is tricky!)
 -- The transpose function transposes the rows and columns of its argument. 
 -- If the inner lists are not all the same length, then the extra elements
 -- are ignored.
@@ -234,8 +246,8 @@ ttranspose = "transpose" ~: TestList
   , transpose [[1,2], [3,4,5]] ~?= [[1,3],[2,4]]
   ]
 
+
 -- concat
- 
 -- The concatenation of all of the elements of a list of lists
 -- for example:
 --    concat [[1,2,3],[4,5,6],[7,8,9]] returns [1,2,3,4,5,6,7,8,9]
@@ -250,7 +262,6 @@ tconcat = "concat" ~: TestList
   ]
 
 -- concatMap
- 
 -- Map a function over all the elements of the list and concatenate the results.
 -- for example:
 --    concatMap (\x -> [x,x+1,x+2]) [1,2,3]  returns [1,2,3,2,3,4,3,4,5]
@@ -266,13 +277,16 @@ tconcatMap = "concatMap" ~: TestList
   ]
 
 --------------------------------------------------------------------------------
+-- | Bowling TestKata for calculating the scores for a bowling game
 
+-- | Case0: All Gutter balls 
 bowlingTest0 :: ([Int] -> Int) -> Test
 bowlingTest0 score = "all gutter balls" ~: 0 ~=? score (replicate 20 0)
 
 score0 :: [Int] -> Int
 score0 _ = 0
 
+-- | Case1: All normal scores with no strikes or spares
 bowlingTest1 :: ([Int] -> Int) -> Test
 bowlingTest1 score = 
    "allOnes" ~: 20 ~=? score (replicate 20 1)
@@ -280,28 +294,28 @@ bowlingTest1 score =
 score1 :: [Int] -> Int
 score1 = sum
 
+-- | Case2: With 1 spare.
 bowlingTest2 :: ([Int] -> Int) -> Test
 bowlingTest2 score = "spare test" ~: 18 ~=? score ([3,7,4] ++ replicate 17 0)
 
 score2 :: [Int] -> Int
-score2 [] = 0
-score2 [x] = x
 score2 (x:x':xs)
   | x + x' == 10 = 10 + spare xs
   | otherwise    = x + x' + score2 xs
   where
     spare [] = 0
     spare l@(y:_) = y + score2 l
+score2 _ = 0 
 
 score2a :: [Int] -> Int
 score2a = score2
 
+
+-- | Case3: Including Strikes
 bowlingTest3 :: ([Int] -> Int) -> Test
-bowlingTest3 score = "strike test" ~: (25 + 19 + 9 + 48) ~=? score ([10,10,5,4] ++ replicate 16 3)
+bowlingTest3 score = "strike test" ~: (25 + 19 + 9 + 42) ~=? score ([10,10,5,4] ++ replicate 14 3)
 
 score3 :: [Int] -> Int
-score3 [] = 0
-score3 [x] = x
 score3 (x:x':xs)
   | x == 10      = 10 + strike (x':xs)
   | x + x' == 10 = 10 + spare xs
@@ -309,28 +323,41 @@ score3 (x:x':xs)
   where
     strike [] = 0 -- impossible case!
     strike l@[y] = y + score3 l
-    strike l@[y,y'] = y + y' + score3 l
+    strike l@[y,y'] = y + y'  + score3 l
     strike l@(y:y':_) = y + y' + score3 l
     spare [] = 0
     spare l@(y:_) = y + score3 l
+score3 _ = 0 
 
+-- | Case5: Combining everything together with spares and strikes.
 bowlingTest4 :: ([Int] -> Int) -> Test
-bowlingTest4 score = "perfect game" ~: 300 ~=? score (replicate 12 10) 
+bowlingTest4 score = "perfect game" ~: 300 ~=? score (replicate 12 10)
 
 score4 :: [Int] -> Int
-score4 [] = 0
-score4 [x] = x
-score4 (x:x':xs)
-  | x == 10      = 10 + strike (x':xs)
-  | x + x' == 10 = 10 + spare xs
-  | otherwise    = x + x' + score4 xs
-  where
-    strike [] = 0 -- impossible case!
-    strike [y] = y
-    strike [y,y'] = y + y'
-    strike l@(y:y':_) = y + y' + score4 l
-    spare [] = 0
-    spare l@(y:_) = y + score4 l
+score4 = score where
+  score (x:y:xs) 
+    -- Special Case: Last Strike with 2 additional bonus.
+    | x == 10 && length xs == 1 = 10 + strikeBonus (y:xs)    
+    -- Strike Case with bonus on next 2 pins.
+    | x == 10 && length xs > 1  = 10 + strikeBonus (y:xs) + score (y:xs)
+    -- Spare Case with bonus on next pin.
+    | x + y == 10               = 10 + spareBonus xs + score xs
+    -- Normal Case
+    | otherwise                 = x + y + score xs
+    where
+      spareBonus (a:_)    = a 
+      spareBonus _        = 0
+      strikeBonus (a:b:_) = a + b
+      strikeBonus _       = 0
+  score _    = 0
+
+-- |Testcase with strike at the end
+bowlingTest5 :: ([ Int ] -> Int) -> Test
+bowlingTest5 score = "Complex game" ~: 133 ~=? score [4,2,5,3,2,2,10,10,4,5,7,3,2,4,2,8,10,10,5]
+
+-- |Testcase with spare at the end
+bowlingTest6 :: ([ Int ] -> Int) -> Test
+bowlingTest6 score = "Complex game2" ~: 132 ~=? score [4,2,10,2,2,10,10,4,5,7,3,2,4,10,4,6,8]
 
 testBowlingKata :: Test
 testBowlingKata = TestList (map checkOutput scores) where
@@ -362,15 +389,13 @@ subseqs (x:xs) = concatMap (\subseq -> [subseq, x:subseq]) (subseqs xs)
 
 -- | Computes the longest common subsequence of the two strings.
 lcs :: String -> String -> String 
-lcs lseq rseq = foldr longest "" $ subseqs lseq `intersect` subseqs rseq
-  where
-    longest curr accu
-      | length curr > length accu = curr
-      | otherwise = accu
+lcs s1 s2 =
+  maximumBy (comparing length) $ subseqs s1 `intersect` subseqs s2
 
 testLcs :: Test
 testLcs = "Lcs" ~: TestList
-  [ lcs "Advanced" "Advantaged" ~?= "Advaned"
+  [ lcs "" "cisab" ~?= ""
+  , lcs "Advanced" "Advantaged" ~?= "Advaned"
   , lcs "abcd" "acbd" ~?= "acd"
   , lcs "acabcbc" "abc" ~?= "abc"
   , lcs "hello" "world" ~?= "o"
