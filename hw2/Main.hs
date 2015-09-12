@@ -240,39 +240,30 @@ tzipTree = "zipTree" ~: TestList
 
 ----------------------------------------------------------------------
 
+-- | An XML "Path" identifying a node within an XML document.
 type XMLPath = String
 
-splitOn :: Char -> String -> [String]
-splitOn sep = uncurry (:) . foldr go ([],[])
-  where
-    go chr (split, splits)
-      | chr /= sep = (chr:split, splits)
-      | otherwise  = ([], split:splits)
-
-getElement :: XMLPath -> SimpleXML -> Maybe [SimpleXML]
-getElement path root = getElem (splitOn '/' path) root
-  where
-    getElem _ (PCDATA _) = Nothing
-    getElem [] xml = Just [xml]
-    getElem (p:ps) (Element tag children)
-      | p == tag  = foldr justs Nothing $ map (getElem ps) children
-      | otherwise = Nothing
-    justs Nothing accu       = accu
-    justs e@(Just _) Nothing = e
-    justs (Just x) (Just xs) = Just $ x ++ xs
-
---removeElement :: XMLPath -> SimpleXML -> SimpleXML
---removeElement path root
---  | tag root == path = error "removeElement: cannot remove root element"
---  | otherwise        = head $ remove (splitOn '/' path) root
+--splitOn :: Char -> String -> [String]
+--splitOn sep = uncurry (:) . foldr go ([],[])
 --  where
---    remove _ xml@(PCDATA _) = [xml]
---    remove [] xml@(Element _ _) = []
---    remove (p:ps) xml@(Element t cs)
---      | p /= t = [xml]
---      | p == t = [Element t (concatMap (remove ps) cs)]
+--    go chr (split, splits)
+--      | chr /= sep = (chr:split, splits)
+--      | otherwise  = ([], split:splits)
+--
+--getElement :: XMLPath -> SimpleXML -> Maybe [SimpleXML]
+--getElement xmlpath root = getElem (splitOn '/' xmlpath) root
+--  where
+--    getElem _ (PCDATA _) = Nothing
+--    getElem [] xml = Just [xml]
+--    getElem (p:ps) (Element tag children)
+--      | p == tag  = foldr justs Nothing $ map (getElem ps) children
+--      | otherwise = Nothing
+--    justs Nothing accu       = accu
+--    justs e@(Just _) Nothing = e
+--    justs (Just x) (Just xs) = Just $ x ++ xs
 
--- | Substitutes tag names in given 'SimpleXML'.
+-- | Substitute tags in the given XML document as specified by the
+-- substitution map 'substs'.
 substitute :: [(XMLPath, String)] -> SimpleXML -> SimpleXML
 substitute substs = subst ""
   where
@@ -284,27 +275,19 @@ substitute substs = subst ""
                    | otherwise    = context ++ "/" ++ name
         newName = fromMaybe name (lookup newContext substs)
 
--- | Prunes an XML structure top-down omitting the nodes in 'exceptions'
-flattenBut :: [ElementName] -> SimpleXML -> [SimpleXML]
-flattenBut _ xml@(PCDATA _) = [xml]
-flattenBut exceptions xml@(Element tag cs)
+-- | Flattens an XML document top-down omitting the nodes in 'exceptions'
+flattenExcept :: [ElementName] -> SimpleXML -> [SimpleXML]
+flattenExcept _ xml@(PCDATA _) = [xml]
+flattenExcept exceptions xml@(Element tag cs)
   | tag `elem` exceptions = [xml]
-  | otherwise = concatMap (flattenBut exceptions) cs
+  | otherwise = concatMap (flattenExcept exceptions) cs
+
+flatten :: SimpleXML -> [SimpleXML]
+flatten = flattenExcept []
 
 formatPlay :: SimpleXML -> SimpleXML
-formatPlay xml =
-  Element "html" $ [ restructure . substitute translations $ xml ]
+formatPlay xml = Element "html" [ restructure (substitute translations xml) ]
   where
-    putBreak xml@(PCDATA _) = [xml, br]
-    putBreak xml@(Element t _)
-      | t == "b"  = [xml, br]
-      | otherwise = [xml]
-    restructure (Element "body" (title:artists:acts))
-      = Element "body" $ [title, subtitle] ++
-          concatMap putBreak
-            (flattenBut [] artists ++
-             concatMap (flattenBut [ "h1", "h2", "h3", "b" ]) acts)
-    restructure _ = error "formatPlay: input XML format is invalid"
     translations =
       [ ("PLAY", "body")
       , ("PLAY/TITLE", "h1")
@@ -313,7 +296,19 @@ formatPlay xml =
       , ("PLAY/ACT/SCENE/SPEECH/SPEAKER", "b")
       ]
     subtitle = Element "h2" [PCDATA "Dramatis Personae"]
-    br = Element "br" []
+    restructure (Element "body" (title:artists:acts)) =
+      Element "body" $ [title, subtitle] ++ putBreaks (artists' ++ acts')
+      where 
+        artists' = flatten artists
+        acts' = concatMap (flattenExcept ["h1", "h2", "h3", "b"]) acts
+    restructure _ = error "formatPlay: input XML format is invalid"
+    putBreaks = foldr (breakAfter ["b"]) []
+      where 
+        breakAfter _ leaf@(PCDATA _) acc = leaf:br:acc
+        breakAfter tags node@(Element tag _) acc
+          | tag `elem` tags = node:br:acc
+          | otherwise       = node:acc
+        br = Element "br" []
 
 firstDiff :: Eq a => [a] -> [a] -> Maybe ([a],[a])
 firstDiff [] [] = Nothing
