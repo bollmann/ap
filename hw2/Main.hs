@@ -69,7 +69,7 @@ takeWhile p = foldr go []
   where
     go x acc
       | p x       = x:acc
-      | otherwise = acc
+      | otherwise = []
 
 ttakeWhile :: Test
 ttakeWhile = "takeWhile" ~: TestList
@@ -123,7 +123,7 @@ data Tree a = Leaf | Branch a (Tree a) (Tree a) deriving (Show, Eq)
 
 foldTree :: b -> (a -> b -> b -> b) -> Tree a -> b
 foldTree e _ Leaf             = e
-foldTree e n (Branch a n1 n2) = n a (foldTree e n n1) (foldTree e n n2)
+foldTree e f (Branch a n1 n2) = f a (foldTree e f n1) (foldTree e f n2)
 
 mapTree :: (a -> b) -> Tree a -> Tree b
 mapTree f = foldTree Leaf (\x t1 t2 -> Branch (f x) t1 t2)
@@ -188,7 +188,7 @@ allTree p = foldTree True (\x lt rt -> x && lt && rt) . mapTree p
 
 tallTree :: Test
 tallTree = "allTree" ~: TestList
-  [ allTree odd tree1 ~?= False
+  [ allTree odd tree1              ~?= False
   , allTree (`elem` [1,2,3]) tree1 ~?= True
   ]
 
@@ -203,22 +203,21 @@ tallTree = "allTree" ~: TestList
 --    map2Tree (+) (Branch 1 Leaf (Branch 2 Leaf Leaf)) (Branch 3 Leaf Leaf)
 --        should return (Branch 4 Leaf Leaf)
 
---foldTree :: b -> (a -> b -> b -> b) -> Tree a -> b
---foldTree e _ Leaf             = e
---foldTree e f (Branch a n1 n2) = f a (foldTree e f n1) (foldTree e f n2)
---
---mapTree :: (a -> b) -> Tree a -> Tree b
---mapTree f = foldTree Leaf (\x t1 t2 -> Branch (f x) t1 t2)
-
 map2Tree :: (a -> b -> c) -> Tree a -> Tree b -> Tree c
-map2Tree f (Branch x l1 r1) (Branch y l2 r2) =
-  Branch (f x y) (map2Tree f l1 l2) (map2Tree f r1 r2)
-map2Tree _ _ _ = Leaf
+map2Tree f t1 t2 = (foldTree (\_ -> Leaf) go t1) t2
+  where
+    go x lf rf = \t -> case t of
+      Leaf         -> Leaf
+      Branch y l r -> Branch (f x y) (lf l) (rf r)
 
 tmap2Tree :: Test
 tmap2Tree = "map2Tree" ~: TestList
   [ map2Tree (+) (Branch 1 Leaf (Branch 2 Leaf Leaf)) (Branch 3 Leaf Leaf)
-    ~?= (Branch 4 Leaf Leaf) ]
+                             ~?= (Branch 4 Leaf Leaf)
+  , map2Tree (*) tree1 tree1 ~?= mapTree (\x -> x*x) tree1
+  , map2Tree (*) tree1 Leaf  ~?= Leaf
+  , map2Tree (*) Leaf tree1  ~?= Leaf
+  ]
 
 -- zipTree takes two trees and returns a tree of corresponding pairs. If
 -- one input branch is smaller, excess elements of the longer branch are
@@ -236,7 +235,12 @@ zipTree = map2Tree (,)
 tzipTree :: Test
 tzipTree = "zipTree" ~: TestList
   [ zipTree (Branch 1 (Branch 2 Leaf Leaf) Leaf) (Branch True Leaf Leaf)
-    ~?= (Branch (1,True) Leaf Leaf) ]
+    ~?= (Branch (1,True) Leaf Leaf)
+  , zipTree tree1 tree1
+    ~?= (Branch (1,1) (Branch (2,2) Leaf Leaf) (Branch (3,3) Leaf Leaf))
+  , zipTree tree1 (Leaf :: Tree Int)  ~?= Leaf
+  , zipTree (Leaf :: Tree Char) tree1 ~?= Leaf
+  ]
 
 ----------------------------------------------------------------------
 
