@@ -15,7 +15,7 @@ import Data.Maybe as Maybe
 
 import Test.QuickCheck
 import Control.Monad (liftM, liftM2)
-import Control.Applicative ((<$>), (<|>))
+import Control.Applicative ((<|>))
 import System.Random (Random)
 
 
